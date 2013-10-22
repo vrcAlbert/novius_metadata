@@ -20,7 +20,7 @@ class Behaviour_Hasmetadata extends \Nos\Orm_Behaviour
     public static function _init()
     {
         \Nos\I18n::current_dictionary('novius_metadata::common');
-        \Config::loadConfiguration('novius_metadata::metadata_classes', true);
+        \Config::load('novius_metadata::metadata_classes', true);
     }
 
     public function __construct($class)
@@ -82,7 +82,7 @@ class Behaviour_Hasmetadata extends \Nos\Orm_Behaviour
 
     public function getMetadataClasses()
     {
-        $metadata_classes = \Config::get('novius_metadata::metadata_classes', array());
+        $metadata_classes = \Config::loadConfiguration('novius_metadata::metadata_classes');
 
         foreach ($this->_properties['exclude'] as $metadata_class) {
             unset($metadata_classes[$metadata_class]);
@@ -97,39 +97,39 @@ class Behaviour_Hasmetadata extends \Nos\Orm_Behaviour
     {
         $metadata_classes = $this->getMetadataClasses();
         foreach ($metadata_classes as $key => $metadata_class) {
+        $label_metadata = __('Metadata');
             $config['fields']['metadata_'.$key] = \Arr::merge(array(
                 'renderer' => 'Novius\Metadata\Renderer_Metadata',
                 'renderer_options' => array(
                     'metadata_class' => $metadata_class,
                 ),
             ), \Arr::get($metadata_class, 'field'));
-            $label_metadata = \Arr::get($metadata_class, 'group', __('Metadata'));
+            if (!empty($metadata_class['group'])) {
+                $label_metadata = $metadata_class['group'];
+            }
             foreach ($config['layout'] as $key_layout => $layout) {
                 if ($layout['view'] === 'nos::form/layout_standard') {
-                    if (!isset($config['layout'][$key_layout]['params']['menu']['view'])) {
-                        //short configuration for menu
-                        $config['layout'][$key_layout]['params']['menu'] = \Arr::merge(
-                            $config['layout'][$key_layout]['params']['menu'],
-                            array($label_metadata => array('metadata_'.$key))
-                        );
+                    $menu = current($config['layout'][$key_layout]['params']['menu']);
+                    //short configuration for menu
+                    if (empty($menu['view'])) {
+                        if (!array_key_exists($label_metadata, $config['layout'][$key_layout]['params']['menu'])) {
+                            //set $label_metadata key in the menu
+                            $config['layout'][$key_layout]['params']['menu'][$label_metadata] = array();
+                        }
+                        $config['layout'][$key_layout]['params']['menu'][$label_metadata][] = 'metadata_'.$key;
                     } else {
                         //complete configuration for menu
-                        $config['layout'][$key_layout]['params']['menu'] = \Arr::merge(
-                            $config['layout'][$key_layout]['params']['menu'],
-                            array(
-                                'accordion' => array(
-                                    'params' => array(
-                                        'accordions' => array(
-                                            $label_metadata = array(
-                                                'title' => $label_metadata,
-                                                'fields' => array(array('metadata_'.$key)),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            )
-                        );
+                        if (!array_key_exists($label_metadata, $config['layout'][$key_layout]['params']['menu']['accordion']['params']['accordions'])) {
+                            //set $label_metadata key in the menu
+                            $config['layout'][$key_layout]['params']['menu']['accordion']['params']['accordions'][$label_metadata] = array(
+                                'title' => $label_metadata,
+                                'fields' => array(
+                                )
+                            );
+                        }
+                        $config['layout'][$key_layout]['params']['menu']['accordion']['params']['accordions'][$label_metadata]['fields'][] =  'metadata_'.$key;
                     }
+
                 }
             }
         }
